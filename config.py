@@ -27,8 +27,8 @@ class Config:
     RETRY_SLEEP_TIME = 15
     
     # 输出配置
-    OUTPUT_CSV_PATH = "ALL_STOCKS_scored_results.csv"
-    FAILED_JSON_PATH = "ALL_STOCKS_failed_tasks.json"
+    OUTPUT_CSV_PATH = "scored_results.csv"
+    FAILED_JSON_PATH = "scored_failed_tasks.json"
     
     # 目标股票
     TARGET_STOCK_CODES = ["000001"]

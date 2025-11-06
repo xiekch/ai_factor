@@ -28,7 +28,7 @@ class DataProcessor:
                 return None
 
             # 加载数据
-            data = json.loads(raw_content)[10]  # 注意这里的索引[10]是根据原代码逻辑保留的
+            data = json.loads(raw_content)[:10]
             logger.info(f"成功从 {file_path} 加载了 {len(data)} 条记录。")
             return data
 

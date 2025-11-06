@@ -13,7 +13,6 @@ from langchain_core.messages import BaseMessage, SystemMessage
 
 from config import Config
 from logger import logger
-from models import StockScore
 
 class LLMService:
     """封装LLM调用相关的功能"""
@@ -74,7 +73,7 @@ class LLMService:
    - 中间值示例：0.6（“新闻提及目标公司子公司的小额合作项目，不涉及母公司核心业务”）；0.3（“行业报告中列举目标公司为行业参与者之一，无具体信息”）。
 
 输出格式（请严格按照JSON格式输出，键为因子名，值为浮点数），不需要输出其他内容：  
-{"Fundamental_Positive": 0.XX, "Impact_Cycle_Length": 0.XX, "Timeliness_Weight": 0.XX, "Information_Certainty": 0.XX, "Information_Relevance": 0.XX}
+{{"Fundamental_Positive": 0.XX, "Impact_Cycle_Length": 0.XX, "Timeliness_Weight": 0.XX, "Information_Certainty": 0.XX, "Information_Relevance": 0.XX}}
 ---
 股票名称: {stock_name}
 股票代码: {stock_code}
@@ -147,19 +146,10 @@ class LLMService:
                     }
             
             except Exception as e:
-                error_msg = str(e)
-                if "rate limit" in error_msg.lower() or "quota" in error_msg.lower():
-                    logger.warning(
-                        f"ID {task_item.get('_id', 'N/A')} 触发限流。第 {attempt + 1}/{Config.MAX_RETRIES} 次尝试。 {Config.RETRY_SLEEP_TIME} 秒后重试..."
-                    )
-                elif "timeout" in error_msg.lower():
-                    logger.warning(
-                        f"ID {task_item.get('_id', 'N/A')} 请求超时。第 {attempt + 1}/{Config.MAX_RETRIES} 次尝试。 {Config.RETRY_SLEEP_TIME} 秒后重试..."
-                    )
-                else:
-                    logger.error(f"ID {task_item.get('_id', 'N/A')} API调用错误: {error_msg}")
-                    return {"status": "failed", "error": error_msg}
-                
+                logger.error(
+                    f"ID {task_item.get('_id', 'N/A')} 调用LLM失败。错误: {e}. 第 {attempt + 1}/{Config.MAX_RETRIES} 次尝试。 {Config.RETRY_SLEEP_TIME} 秒后重试...",
+                    exc_info=True
+                )
                 # 等待后重试
                 time.sleep(Config.RETRY_SLEEP_TIME)
         
