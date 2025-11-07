@@ -15,7 +15,7 @@ load_dotenv()
 class Config:
     """集中管理所有配置参数"""
     # API配置
-    API_KEY = os.getenv("API_KEY")
+    API_KEY = os.getenv("API_KEY", "")
     BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     MODEL_NAME = "qwen-turbo"
     REQUEST_TIMEOUT = 60
@@ -32,4 +32,5 @@ class Config:
     
     # 目标股票
     TARGET_STOCK_CODES = ["000001"]
+    PROCESS_NUM = 20
     TARGET_STOCK_CODES_SET: Set[str] = set(TARGET_STOCK_CODES)

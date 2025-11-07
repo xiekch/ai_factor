@@ -9,7 +9,7 @@ import os
 import json
 import pandas as pd
 from typing import List, Dict, Any, Optional, Set
-
+from config import Config
 from logger import logger
 
 class DataProcessor:
@@ -28,7 +28,7 @@ class DataProcessor:
                 return None
 
             # 加载数据
-            data = json.loads(raw_content)[:10]
+            data = json.loads(raw_content)[:Config.PROCESS_NUM]
             logger.info(f"成功从 {file_path} 加载了 {len(data)} 条记录。")
             return data
 

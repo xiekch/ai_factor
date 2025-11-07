@@ -13,28 +13,32 @@ from langchain_core.messages import BaseMessage, SystemMessage
 
 from config import Config
 from logger import logger
+from pydantic.types import SecretStr
+
 
 class LLMService:
     """封装LLM调用相关的功能"""
-    
+
     def __init__(self):
         """初始化LLM客户端和解析器"""
         try:
-            self.llm = ChatTongyi(model=Config.MODEL_NAME, api_key=Config.API_KEY)
+            self.llm = ChatTongyi(
+                model=Config.MODEL_NAME, api_key=SecretStr(Config.API_KEY), verbose=True
+            )
             logger.info(f"成功初始化LangChain LLM客户端，模型: {Config.MODEL_NAME}")
         except Exception as e:
             logger.error(f"LLM客户端初始化失败: {e}")
             raise
-    
+
     def create_prompt(self, task_item: Dict[str, Any]) -> List[BaseMessage]:
         """创建LangChain提示词"""
-        title = task_item.get("title", "") 
-        content =  task_item.get("content", "")
+        title = task_item.get("title", "")
+        content = task_item.get("content", "")
         source = task_item.get("source", "unknown")
         publish_time = task_item.get("pub_time", "unknown")
         stock_code = task_item.get("stock_code", "N/A")
         stock_name = task_item.get("stock_name", "N/A")
-        
+
         # 系统提示词
         system_prompt = f"""你是一名顶尖的中国A股市场金融分析师，擅长从海量文本信息中挖掘对股价有影响的信号。
 任务：分析以下股票新闻内容，针对每条新闻输出5个AI因子的取值（保留1位小数，范围0-1），每个因子基于新闻内容独立评估。
@@ -72,7 +76,7 @@ class LLMService:
    - 取值0：完全无关，如“仅讨论新能源行业趋势，未提及任何具体公司”“新闻主体为同行业其他公司，仅附带提及目标公司名称”。  
    - 中间值示例：0.6（“新闻提及目标公司子公司的小额合作项目，不涉及母公司核心业务”）；0.3（“行业报告中列举目标公司为行业参与者之一，无具体信息”）。
 
-输出格式（请严格按照JSON格式输出，键为因子名，值为浮点数），不需要输出其他内容：  
+输出格式（输出推理过程，最后一行严格按照JSON格式输出，键为因子名，值为浮点数）：  
 {{"Fundamental_Positive": 0.XX, "Impact_Cycle_Length": 0.XX, "Timeliness_Weight": 0.XX, "Information_Certainty": 0.XX, "Information_Relevance": 0.XX}}
 ---
 股票名称: {stock_name}
@@ -82,76 +86,51 @@ class LLMService:
 发布时间：{publish_time}
 {content}
 """
-        
+
         return [SystemMessage(system_prompt)]
-    
+
     def get_score_with_retry(self, task_item: Dict[str, Any]) -> Dict[str, Any]:
         """调用LLM获取评分，带重试机制"""
         # 检查内容是否为空
         full_content = task_item.get("content", "")
         if not full_content.strip():
-            logger.warning(f"ID {task_item.get('_id', 'N/A')} 的文本内容为空，跳过处理。")
+            logger.warning(
+                f"ID {task_item.get('_id', 'N/A')} 的文本内容为空，跳过处理。"
+            )
             return {"status": "skipped", "error": "Empty content"}
-        
+
         # 准备提示词
         messages = self.create_prompt(task_item)
-        
+
         # 重试逻辑
         for attempt in range(Config.MAX_RETRIES):
             try:
                 # 调用LLM
                 response = self.llm.invoke(messages)
-                print(response)
+                print(response.content)
                 # 解析结果
-                try:
-                    # 确保response.content是字符串类型，处理不同可能的返回类型
-                    if isinstance(response.content, str):
-                        content_str = response.content.strip()
-                    elif isinstance(response.content, list):
-                        # 如果是列表，尝试将每个元素转换为字符串并连接
-                        content_str = " ".join(str(item) for item in response.content).strip()
-                    else:
-                        content_str = str(response.content).strip()
-                    
-                    score_data = json.loads(content_str)
-                    return {
-                        "status": "success", 
-                        "data": score_data
-                    }
-                except Exception as parse_error:
-                    # 安全处理日志输出
-                    response_content_str = str(response.content)[:200] + "..." if len(str(response.content)) > 200 else str(response.content)
-                    logger.error(
-                        f"ID {task_item.get('_id', 'N/A')} 的响应解析失败。错误: {parse_error}. 内容: {response_content_str}"
-                    )
-                    # 尝试直接JSON解析作为备选方案
-                    try:
-                        # 安全处理content
-                        if isinstance(response.content, str):
-                            content_str = response.content
-                        elif isinstance(response.content, list):
-                            content_str = " ".join(str(item) for item in response.content)
-                        else:
-                            content_str = str(response.content)
-                        score_data = json.loads(content_str)
-                        # 验证字段
-                        if all(field in score_data for field in ["Fundamental_Positive", "Impact_Cycle_Length", "Timeliness_Weight", "Information_Certainty", "Information_Relevance"]):
-                            return {"status": "success", "data": score_data}
-                    except Exception as json_error:
-                        logger.error(f"JSON解析失败: {json_error}")
-                    return {
-                        "status": "failed",
-                        "error": "ParsingError",
-                        "content": response.content
-                    }
-            
+
+                # 确保response.content是字符串类型，处理不同可能的返回类型
+                if isinstance(response.content, str):
+                    content_str = response.content.split("\n")[-1].strip()
+                elif isinstance(response.content, list):
+                    # 如果是列表，尝试将每个元素转换为字符串并连接
+                    content_str = " ".join(
+                        str(item) for item in response.content
+                    ).strip()
+                else:
+                    content_str = str(response.content).strip()
+
+                score_data = json.loads(content_str)
+                return {"status": "success", "data": score_data}
+
             except Exception as e:
                 logger.error(
                     f"ID {task_item.get('_id', 'N/A')} 调用LLM失败。错误: {e}. 第 {attempt + 1}/{Config.MAX_RETRIES} 次尝试。 {Config.RETRY_SLEEP_TIME} 秒后重试...",
-                    exc_info=True
+                    exc_info=True,
                 )
                 # 等待后重试
                 time.sleep(Config.RETRY_SLEEP_TIME)
-        
+
         logger.error(f"ID {task_item.get('_id', 'N/A')} 超过最大重试次数。")
         return {"status": "failed", "error": "Max retries exceeded"}

@@ -59,7 +59,8 @@ class StockScorer:
                     if result["status"] == "success":
                         flat_result: Dict[str, Any] = {
                             "id": item.get("_id"),
-                            "stock_code": item.get("stock_code")
+                            "stock_code": item.get("stock_code"),
+                            "pub_time": item.get("pub_time"),
                             **result["data"],
                         }
                         successful_results.append(flat_result)
