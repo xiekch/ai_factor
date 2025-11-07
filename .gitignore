@@ -1,6 +1,5 @@
 .env
 /guba_df
-*.csv
 __pycache__/
 .DS_Store
 *.log

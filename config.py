@@ -27,11 +27,12 @@ class Config:
     RETRY_SLEEP_TIME = 15
     
     # 输出配置
-    OUTPUT_CSV_PATH = "scored_results.csv"
-    FAILED_JSON_PATH = "scored_failed_tasks.json"
+    OUTPUT_DIRECTORY = "./output"
+    OUTPUT_CSV_PATH = os.path.join(OUTPUT_DIRECTORY, "scored_results.csv")
+    FAILED_JSON_PATH = os.path.join(OUTPUT_DIRECTORY, "scored_failed_tasks.json")
     
     # 目标股票
     TARGET_STOCK_CODES = ["000001"]
     PROCESS_NUM = 20
     TARGET_STOCK_CODES_SET: Set[str] = set(TARGET_STOCK_CODES)
-    NEED_THINKING = True
+    NEED_THINKING = False
