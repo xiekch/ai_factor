@@ -76,6 +76,10 @@ class StockScorer:
                         "error_details": {"status": "exception", "error": str(e)}
                     })
         
+        # 按pub_time从新到旧排序
+        successful_results.sort(key=lambda x: x.get('pub_time', ''), reverse=True)
+        failed_tasks.sort(key=lambda x: x.get('id', {}).get('pub_time', '') if isinstance(x.get('id'), dict) else '', reverse=True)
+        
         logger.info(f"文件 {file_path} 的API调用全部完成，成功 {len(successful_results)} 条，失败 {len(failed_tasks)} 条")
         return successful_results, failed_tasks
     
