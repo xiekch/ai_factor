@@ -38,14 +38,15 @@ class LLMService:
         publish_time = task_item.get("pub_time", "unknown")
         stock_code = task_item.get("stock_code", "N/A")
         stock_name = task_item.get("stock_name", "N/A")
-
+        thingking_prompt = "输出格式（输出简短的思考，最后一行严格按照JSON格式输出，键为因子名，值为浮点数，不需要代码块格式包裹）："
+        no_thinking_prompt = "输出格式(只输出JSON格式，键为因子名，值为浮点数，不需要代码块格式包裹）："
         # 系统提示词
         system_prompt = f"""你是一名顶尖的中国A股市场金融分析师，擅长从海量文本信息中挖掘对股价有影响的信号。
 任务：分析以下股票新闻内容，针对每条新闻输出5个AI因子的取值（保留1位小数，范围0-1），每个因子基于新闻内容独立评估。
 
 因子定义及取值说明：
-1. 基本面正向变动强度（Fundamental_Positive）  
-   - 定义：新闻对公司核心基本面（营收、利润、成本、技术壁垒、资产质量等）的正向影响程度。  
+1. 基本面影响强度（Fundamental_Impact）  
+   - 定义：新闻对公司核心基本面（营收、利润、成本、技术壁垒、资产质量等）的影响程度。 大于 0.5 表示利好，小于 0.5 表示利空，等于 0.5 表示中性或不相干影响。
    - 取值1：极端利好，如“公司签订100亿元长期订单，预计年增营收50%”“研发出颠覆性技术，专利保护期20年”。  
    - 取值0.7：中等利好，如“季度营收增长15%”“获得地方政府补贴”。
    - 取值0.5：中性或不相干影响，如“未提及具体财务影响”“市场对公司产品的评价存在争议”。
@@ -90,8 +91,8 @@ class LLMService:
    - 取值0.2：相关性很弱，如“附带提及公司名称”“行业数据的组成部分”。
    - 取值0：完全无关，如“新闻主体为同行业其他公司，仅附带提及目标公司名称”。
 
-输出格式（输出推理过程，最后一行严格按照JSON格式输出，键为因子名，值为浮点数，不需要代码块格式包裹）：  
-{{"Fundamental_Positive": 0.XX, "Impact_Cycle_Length": 0.XX, "Timeliness_Weight": 0.XX, "Information_Certainty": 0.XX, "Information_Relevance": 0.XX}}
+{thingking_prompt if Config.NEED_THINKING else no_thinking_prompt}
+{{"Fundamental_Impact": 0.XX, "Impact_Cycle_Length": 0.XX, "Timeliness_Weight": 0.XX, "Information_Certainty": 0.XX, "Information_Relevance": 0.XX}}
 ---
 股票名称: {stock_name}
 股票代码: {stock_code}

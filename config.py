@@ -34,3 +34,4 @@ class Config:
     TARGET_STOCK_CODES = ["000001"]
     PROCESS_NUM = 20
     TARGET_STOCK_CODES_SET: Set[str] = set(TARGET_STOCK_CODES)
+    NEED_THINKING = True
