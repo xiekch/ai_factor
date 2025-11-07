@@ -1,28 +1,27 @@
+# file: backtest.py
+
 """
-AI 因子独立回测脚本：
-- 加载 AI 因子信号 (ceshi.csv) 和股票日线数据 (stock_daily_basic_data_2025.csv)。
+AI 因子独立回测脚本（修改版）：
+- 加载 AI 因子信号 (scored_results.csv) 和股票日线数据 (stock_daily_basic_data_2025.csv)。
 - 实现了一套基于信号发布时间 (pub_time) 的精细化入场逻辑（区分盘前、盘中、盘后）。
-- 根据信号中的 'time_horizon' 决定持仓周期。
+- 根据新策略：只有当 Fundamental_Impact、Information_Certainty 和 Information_Relevance 大于阈值，
+  且 Timeliness_Weight 小于阈值时才买入，固定持有期为2天。
 - 计算并统计回测结果，包括总体、按多空、按周期及交叉维度的平均收益率。
 - 将所有交易详情保存到 backtest_trades_results_final_entry.csv。
 """
 
 import pandas as pd
 import datetime
+from config import Config
 
 # --- 1. 策略参数定义 ---
 
-# 定义持仓周期映射关系
-HORIZON_MAP = {
-    '短期': 5,   # 持有5个交易日
-    '中期': 20,  # 持有20个交易日
-    '长期': 60   # 持有60个交易日
-}
-
-# 定义信号阈值
-CONF_THRESHOLD = 0.5         # event_driven 和 novelty 的置信度阈值
-SENT_POSITIVE_THRESHOLD = 0.3  # 情绪看涨阈值
-SENT_NEGATIVE_THRESHOLD = -0.3 # 情绪看跌阈值
+# 新策略参数
+FUNDAMENTAL_THRESHOLD = 0.8      # Fundamental_Impact 阈值
+CERTAINTY_THRESHOLD = 0.8        # Information_Certainty 阈值
+RELEVANCE_THRESHOLD = 0.8        # Information_Relevance 阈值
+TIMELINESS_THRESHOLD = 0.5       # Timeliness_Weight 阈值
+HOLDING_PERIOD = 2               # 固定持有期为2天
 
 # 定义时间边界 (用于区分盘前、盘中、盘后)
 TIME_0900 = datetime.time(9, 0, 0)
@@ -44,13 +43,13 @@ def run_backtest_final_entry():
         - T+1日 (> signal_date) 开盘价 (open)
     
     出场逻辑：
-    - 在入场日后的第 N (holding_period) 个交易日，按 收盘价(close) 出场。
+    - 在入场日后的第 2 个交易日，按 收盘价(close) 出场。
     """
     try:
         # --- 2. 加载数据 ---
         print("开始加载数据...")
-        stock_df = pd.read_csv("stock_daily_basic_data_2025.csv")
-        factor_df = pd.read_csv("ceshi.csv")
+        stock_df = pd.read_csv(Config.STOCK_DATA_PATH)
+        factor_df = pd.read_csv(Config.OUTPUT_CSV_PATH)
 
         # --- 3. 预处理股票数据 ---
         stock_df['trade_date'] = pd.to_datetime(stock_df['trade_date'], format='%Y%m%d')
@@ -59,7 +58,7 @@ def run_backtest_final_entry():
         stock_df = stock_df.sort_values(by=['stock_code_match', 'trade_date']) 
 
         # --- 4. 预处理因子数据 ---
-        factor_df['pub_time'] = pd.to_datetime(factor_df['pub_time'], format='%Y/%m/%d %H:%M')
+        factor_df['pub_time'] = pd.to_datetime(factor_df['pub_time'], format='%Y-%m-%d %H:%M:%S')
         factor_df['signal_date_dt'] = factor_df['pub_time'].dt.date
         factor_df['stock_code'] = factor_df['stock_code'].astype(str)
 
@@ -88,24 +87,21 @@ def run_backtest_final_entry():
             # 从缓存中获取 DataFrame 和 交易日集合
             stock_specific_df, trading_days_set = stock_data_cache[stock_code_str]
             
-            # 获取持仓周期
-            holding_period = HORIZON_MAP.get(signal['time_horizon'])
-            if holding_period is None:
-                continue
-
-            # 信号触发逻辑
-            sent = signal['sentiment_score']
-            event = signal['event_driven_score']
-            novel = signal['novelty_score']
+            # 使用新策略逻辑判断是否交易
+            fundamental = signal['Fundamental_Impact']
+            certainty = signal['Information_Certainty']
+            relevance = signal['Information_Relevance']
+            timeliness = signal['Timeliness_Weight']
             
-            trade_type = None
-            if (sent > SENT_POSITIVE_THRESHOLD and event > CONF_THRESHOLD and novel > CONF_THRESHOLD):
-                trade_type = 'long'
-            elif (sent < SENT_NEGATIVE_THRESHOLD and event > CONF_THRESHOLD and novel > CONF_THRESHOLD):
-                trade_type = 'short'
-            
-            if trade_type is None:
+            # 新的入场条件
+            if not (fundamental > FUNDAMENTAL_THRESHOLD and 
+                    certainty > CERTAINTY_THRESHOLD and 
+                    relevance > RELEVANCE_THRESHOLD and 
+                    timeliness < TIMELINESS_THRESHOLD):
                 continue
+            
+            # 简化为只做多头交易
+            trade_type = 'long'
 
             # --- 7. 核心：精细化入场逻辑 ---
             
@@ -165,8 +161,8 @@ def run_backtest_final_entry():
             entry_date = entry_row['trade_date']
 
             # --- 8. 出场逻辑 ---
-            # 基于入场行号 (entry_index) 和持仓周期计算出场行号
-            exit_index = entry_index + holding_period
+            # 基于入场行号 (entry_index) 和固定持仓周期计算出场行号
+            exit_index = entry_index + HOLDING_PERIOD
             
             if exit_index >= len(stock_specific_df):
                 continue # 数据不足以支持持有到期
@@ -176,12 +172,7 @@ def run_backtest_final_entry():
             exit_price = exit_row['close'] # 统一按收盘价卖出
 
             # --- 9. 计算 PnL 和胜率 ---
-            pct_return = 0.0
-            if trade_type == 'long':
-                pct_return = (exit_price - entry_price) / entry_price
-            else: # short
-                pct_return = (entry_price - exit_price) / entry_price
-            
+            pct_return = (exit_price - entry_price) / entry_price
             is_win = pct_return > 0
             
             # 记录结果
@@ -189,15 +180,18 @@ def run_backtest_final_entry():
                 'signal_id': signal['id'],
                 'stock_code': stock_code_str,
                 'pub_time': signal_datetime,
-                'time_horizon': signal['time_horizon'],
-                'holding_period_days': holding_period,
+                'holding_period_days': HOLDING_PERIOD,
                 'trade_type': trade_type,
                 'entry_date': entry_date.date(),
                 'entry_price': entry_price,
                 'exit_date': exit_date.date(),
                 'exit_price': exit_price,
                 'pct_return': pct_return,
-                'is_win': is_win
+                'is_win': is_win,
+                'fundamental_impact': fundamental,
+                'certainty': certainty,
+                'relevance': relevance,
+                'timeliness': timeliness
             })
         
         print("回测执行完毕，开始统计结果...")
@@ -209,9 +203,9 @@ def run_backtest_final_entry():
         trades_df = pd.DataFrame(results)
         
         # 保存交易详情
-        trades_df.to_csv("backtest_trades_results_final_entry.csv", index=False, encoding='utf-8-sig')
+        trades_df.to_csv(Config.BACKTEST_RESULTS_PATH, index=False, encoding='utf-8-sig')
         print(f"\n成功执行 {len(trades_df)} 笔交易。")
-        print("所有交易详情已保存到 'backtest_trades_results_final_entry.csv'")
+        print(f"所有交易详情已保存到 '{Config.BACKTEST_RESULTS_PATH}'")
 
         # --- 按收益率统计 ---
         
@@ -224,29 +218,21 @@ def run_backtest_final_entry():
 
         # 按交易类型（多/空）分析
         print("\n--- 按交易类型 (多/空) 统计 (平均收益率) ---")
-        type_stats_return = trades_df.groupby('trade_type')['pct_return'].agg(['count', 'mean'])
-        type_stats_return.columns = ['交易次数', '平均收益率']
-        type_stats_return['平均收益率'] = type_stats_return['平均收益率'].map('{:.4%}'.format)
-        print(type_stats_return)
+        if 'trade_type' in trades_df.columns:
+            type_stats_return = trades_df.groupby('trade_type')['pct_return'].agg(['count', 'mean'])
+            type_stats_return.columns = ['交易次数', '平均收益率']
+            type_stats_return['平均收益率'] = type_stats_return['平均收益率'].map('{:.4%}'.format)
+            print(type_stats_return)
 
-        # 按持仓周期 (horizon) 分析
-        print("\n--- 按持仓周期 (短期/中期/长期) 统计 (平均收益率) ---")
-        horizon_stats_return = trades_df.groupby('time_horizon')['pct_return'].agg(['count', 'mean'])
-        horizon_stats_return.columns = ['交易次数', '平均收益率']
-        horizon_stats_return['平均收益率'] = horizon_stats_return['平均收益率'].map('{:.4%}'.format)
-        # 确保按 '短期', '中期', '长期' 的顺序显示
-        horizon_order = [h for h in HORIZON_MAP.keys() if h in horizon_stats_return.index]
-        print(horizon_stats_return.loc[horizon_order])
-        
-        # 按类型和周期交叉分析
-        print("\n--- 交叉统计: 类型 vs 周期 (平均收益率) ---")
-        cross_stats_return = trades_df.groupby(['trade_type', 'time_horizon'])['pct_return'].agg(['count', 'mean'])
-        cross_stats_return.columns = ['交易次数', '平均收益率']
-        cross_stats_return['平均收益率'] = cross_stats_return['平均收益率'].map('{:.4%}'.format)
-        if not cross_stats_return.empty:
-            # 确保交叉统计也按周期排序
-            cross_stats_return = cross_stats_return.reindex(level=1, index=horizon_order)
-        print(cross_stats_return)
+        # 胜率统计
+        win_rate = trades_df['is_win'].mean()
+        print(f"\n总体胜率: {win_rate:.2%}")
+
+        # 收益率分布
+        positive_returns = trades_df[trades_df['pct_return'] > 0]['pct_return'].mean()
+        negative_returns = trades_df[trades_df['pct_return'] < 0]['pct_return'].mean()
+        print(f"平均盈利: {positive_returns:.4%}")
+        print(f"平均亏损: {negative_returns:.4%}")
 
 
     except FileNotFoundError as e:

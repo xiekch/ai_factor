@@ -30,6 +30,8 @@ class Config:
     OUTPUT_DIRECTORY = "./output"
     OUTPUT_CSV_PATH = os.path.join(OUTPUT_DIRECTORY, "scored_results.csv")
     FAILED_JSON_PATH = os.path.join(OUTPUT_DIRECTORY, "scored_failed_tasks.json")
+    STOCK_DATA_PATH = "stock_daily_basic_data_2025.csv"
+    BACKTEST_RESULTS_PATH = os.path.join(OUTPUT_DIRECTORY, "backtest_trades_results_final_entry.csv")
     
     # 目标股票
     TARGET_STOCK_CODES = ["000001"]
