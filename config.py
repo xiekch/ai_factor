@@ -18,6 +18,7 @@ class Config:
     API_KEY = os.getenv("API_KEY", "")
     BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
     MODEL_NAME = "qwen-turbo"
+    TEMPERATURE = 0.2
     REQUEST_TIMEOUT = 60
     
     # 处理配置
@@ -35,6 +36,6 @@ class Config:
     
     # 目标股票
     TARGET_STOCK_CODES = ["000001"]
-    PROCESS_NUM = 20
+    PROCESS_NUM = -1
     TARGET_STOCK_CODES_SET: Set[str] = set(TARGET_STOCK_CODES)
     NEED_THINKING = False

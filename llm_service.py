@@ -23,7 +23,10 @@ class LLMService:
         """初始化LLM客户端和解析器"""
         try:
             self.llm = ChatTongyi(
-                model=Config.MODEL_NAME, api_key=SecretStr(Config.API_KEY), verbose=True
+                model=Config.MODEL_NAME,
+                api_key=SecretStr(Config.API_KEY),
+                temperature=Config.TEMPERATURE,
+                verbose=True
             )
             logger.info(f"成功初始化LangChain LLM客户端，模型: {Config.MODEL_NAME}")
         except Exception as e:
@@ -38,8 +41,10 @@ class LLMService:
         publish_time = task_item.get("pub_time", "unknown")
         stock_code = task_item.get("stock_code", "N/A")
         stock_name = task_item.get("stock_name", "N/A")
-        thingking_prompt = "输出格式（输出简短的思考，最后一行严格按照JSON格式输出，键为因子名，值为浮点数，不需要代码块格式包裹）："
-        no_thinking_prompt = "输出格式(只输出JSON格式，键为因子名，值为浮点数，不需要代码块格式包裹）："
+        thinking_prompt = "输出格式（输出简短的思考，最后一行严格按照JSON格式输出，键为因子名，值为浮点数，不需要代码块格式包裹）："
+        no_thinking_prompt = (
+            "输出格式(只输出JSON格式，键为因子名，值为浮点数，不需要代码块格式包裹）："
+        )
         # 系统提示词
         system_prompt = f"""你是一名顶尖的中国A股市场金融分析师，擅长从海量文本信息中挖掘对股价有影响的信号。
 任务：分析以下股票新闻内容，针对每条新闻输出5个AI因子的取值（保留1位小数，范围0-1），每个因子基于新闻内容独立评估。
@@ -91,14 +96,16 @@ class LLMService:
    - 取值0.2：相关性很弱，如“附带提及公司名称”“行业数据的组成部分”。
    - 取值0：完全无关，如“新闻主体为同行业其他公司，仅附带提及目标公司名称”。
 
-{thingking_prompt if Config.NEED_THINKING else no_thinking_prompt}
-{{"Fundamental_Impact": 0.XX, "Impact_Cycle_Length": 0.XX, "Timeliness_Weight": 0.XX, "Information_Certainty": 0.XX, "Information_Relevance": 0.XX}}
+=== 输出区域 ===
+{thinking_prompt if Config.NEED_THINKING else no_thinking_prompt}
+{{"Fundamental_Impact": 0.X, "Impact_Cycle_Length": 0.X, "Timeliness_Weight": 0.X, "Information_Certainty": 0.X, "Information_Relevance": 0.X}}
+
 ---
-股票名称: {stock_name}
-股票代码: {stock_code}
-{title}
-来源：{source}
-新闻发布时间：{publish_time}
+目标股票: {stock_name} ({stock_code})
+新闻标题: {title}
+发布时间: {publish_time}
+新闻来源: {source}
+新闻内容:
 {content}
 """
 
@@ -122,7 +129,9 @@ class LLMService:
             try:
                 # 调用LLM
                 response = self.llm.invoke(messages)
-                logger.info(f"ID {task_item.get('_id', 'N/A')} 的LLM响应内容: {response.content}")
+                logger.info(
+                    f"ID {task_item.get('_id', 'N/A')} 的LLM响应内容: {response.content}"
+                )
                 # 解析结果
 
                 # 确保response.content是字符串类型，处理不同可能的返回类型
