@@ -28,7 +28,9 @@ class DataProcessor:
                 return None
 
             # 加载数据
-            data = json.loads(raw_content)[:Config.PROCESS_NUM]
+            data = json.loads(raw_content)
+            if Config.PROCESS_NUM > 0:
+                data = data[:Config.PROCESS_NUM]
             logger.info(f"成功从 {file_path} 加载了 {len(data)} 条记录。")
             return data
 

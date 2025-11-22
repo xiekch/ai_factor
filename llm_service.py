@@ -42,9 +42,7 @@ class LLMService:
         stock_code = task_item.get("stock_code", "N/A")
         stock_name = task_item.get("stock_name", "N/A")
         thinking_prompt = "输出格式（输出简短的思考，最后一行严格按照JSON格式输出，键为因子名，值为浮点数，不需要代码块格式包裹）："
-        no_thinking_prompt = (
-            "输出格式(只输出JSON格式，键为因子名，值为浮点数，不需要代码块格式包裹）："
-        )
+        no_thinking_prompt = "输出格式(只输出JSON格式，键为因子名，值为浮点数，不需要代码块格式包裹）："
         # 系统提示词
         system_prompt = f"""你是一名顶尖的中国A股市场金融分析师，擅长从海量文本信息中挖掘对股价有影响的信号。
 任务：分析以下股票新闻内容，针对每条新闻输出5个AI因子的取值（保留1位小数，范围0-1），每个因子基于新闻内容独立评估。
@@ -129,9 +127,7 @@ class LLMService:
             try:
                 # 调用LLM
                 response = self.llm.invoke(messages)
-                logger.info(
-                    f"ID {task_item.get('_id', 'N/A')} 的LLM响应内容: {response.content}"
-                )
+                logger.info(f"ID {task_item.get('_id', 'N/A')} 的LLM响应内容: {response.content}")
                 # 解析结果
 
                 # 确保response.content是字符串类型，处理不同可能的返回类型
