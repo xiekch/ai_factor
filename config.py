@@ -23,7 +23,7 @@ class Config:
     
     # 处理配置
     JSON_SOURCE_DIRECTORY = "./guba_df"  # 修改为相对路径
-    MAX_CONCURRENT_REQUESTS = 5
+    MAX_CONCURRENT_REQUESTS = 8
     MAX_RETRIES = 3
     RETRY_SLEEP_TIME = 15
     
@@ -35,7 +35,7 @@ class Config:
     BACKTEST_RESULTS_PATH = os.path.join(OUTPUT_DIRECTORY, "backtest_trades_results_final_entry.csv")
     
     # 目标股票
-    TARGET_STOCK_CODES = ["000001"]
+    TARGET_STOCK_CODES = ["000002","000063"]
     PROCESS_NUM = -1
     TARGET_STOCK_CODES_SET: Set[str] = set(TARGET_STOCK_CODES)
     NEED_THINKING = False
